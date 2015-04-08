@@ -2,6 +2,16 @@ import bz2
 
 f = bz2.open("data\enwiki-20150304-pages-articles-multistream.xml.bz2")
 
+
+def extractBoxSubject(boxHeader):
+    postIbox = boxHeader.split("{{Infobox", 1)[-1]
+    subject = ""
+    for c in postIbox:
+        if not c.isalpha():
+            break
+        subject += c
+    return subject
+
 onDoc = 0
 brackLevel = 0
 onPage = False
@@ -22,7 +32,7 @@ for line in f:
             onInfoBox = True
             # Spin off to function extract_box_subject
             # + account for other cases
-            boxSubject = line.strip("{{Infobox").strip(" ")
+            boxSubject = extract_box_subject(line)
             # Skip info box subject and move on to processing
             # The next line
             # continue
@@ -32,7 +42,7 @@ for line in f:
             box += line
             # Exit the infobox
             if bracketSum == 0:
-                print(box.encode("utf-8").decode())
+                print(box.encode("utf-8"))
                 onInfoBox = False
                 i += 1
                 break
