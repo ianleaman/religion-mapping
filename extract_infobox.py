@@ -1,15 +1,18 @@
 import bz2
 import re
+import sys
+sys.path.append('..')
 
 f = bz2.open("data\enwiki-20150304-pages-articles-multistream.xml.bz2")
 
 
 # TODO: Move this to seperate func
 # ########### Initialize DB for use #########################
+from config import config
 from django.conf import settings as django_settings
 import django
 django_settings.configure(DATABASES=config.DATABASES,
-                          INSTALLED_APPS=("mimir_schema", ), DEBUG=False)
+                          INSTALLED_APPS=("schema", ), DEBUG=False)
 django.setup()
 # End Initialize
 
