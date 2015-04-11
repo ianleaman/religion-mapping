@@ -1,16 +1,35 @@
 import bz2
+import re
 
 f = bz2.open("data\enwiki-20150304-pages-articles-multistream.xml.bz2")
 
 
+# TODO: Move this to seperate func
+# ########### Initialize DB for use #########################
+from django.conf import settings as django_settings
+import django
+django_settings.configure(DATABASES=config.DATABASES,
+                          INSTALLED_APPS=("mimir_schema", ), DEBUG=False)
+django.setup()
+# End Initialize
+
+
 def extractBoxSubject(boxHeader):
     postIbox = boxHeader.split("{{Infobox", 1)[-1]
-    subject = ""
-    for c in postIbox:
-        if not c.isalpha():
-            break
-        subject += c
-    return subject
+    subject = re.split("&|\||{|{{", postIbox, 1)[0]
+
+    return subject.strip().lower()
+
+
+def processBox(box):
+    #  split newline
+
+    print(box)
+    bfields = box.split("\n")
+    print(bfields)
+    #  pair w/ equals
+    #  remove refs (anything w tag)
+    #  clean out links
 
 onDoc = 0
 brackLevel = 0
@@ -32,7 +51,14 @@ for line in f:
             onInfoBox = True
             # Spin off to function extract_box_subject
             # + account for other cases
-            boxSubject = extract_box_subject(line)
+            boxSubject = extractBoxSubject(line)
+            if boxSubject:
+                # print(boxSubject)
+                pass
+            else:
+                # TODO: ignore if this occurs or get next line
+                print(line)
+                print("ERRROR")
             # Skip info box subject and move on to processing
             # The next line
             # continue
@@ -42,10 +68,10 @@ for line in f:
             box += line
             # Exit the infobox
             if bracketSum == 0:
-                print(box.encode("utf-8"))
+                # print(box.encode("utf-8"))
+                processBox(box)
                 onInfoBox = False
                 i += 1
-                break
             # Error Checking
             elif brackLevel < 0:
                 raise Exception("Something went wrong in "
