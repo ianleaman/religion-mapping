@@ -7,8 +7,13 @@ religion
 party
 
 TODO:
-    how should we best track errors?
-    build religion list while processing
+    - how should we best track errors?
+    - build religion list while processing
+    - when trying to determin places give more weights to palces where more
+        locs appear?
+    - refactor get_box_location and get_box_religion
+
+
 '''
 
 import bz2
@@ -130,15 +135,63 @@ def extract_box_date(line, subject=None):
 
 def extract_box_religion(line):
     '''
-    casses:
+    cases:
         1) just religion name
         2) [[link]]
         3) [[link | link]]
         4) [[link]] some text [[link]]
 
     '''
-    line = line.replace("}", "").replace("{", "")
-    print(line, find_all_between(line, "[[", "]]"))
+    final_religions = []
+    if "[[" in line:
+        for entry in find_all_between(line, "[[", "]]"):
+            # Split along the sub catagories
+            for final in entry.split("|"):
+                final_religions.append(final)
+    else:
+        line = line.strip()
+        # Checks if there is a valid religion, if not return none rather than
+        # an empty list
+        if line:
+            final_religions.append(line)
+        else:
+            return None
+
+    return final_religions
+
+
+def extract_box_location(line):
+    '''
+    cases:
+        1) just place name
+        2) [[link]]
+        3) [[link | link]]
+        4) [[link]] some text [[link]]
+
+    '''
+    final_places = []
+    if "[[" in line:
+        for entry in find_all_between(line, "[[", "]]"):
+            # Split along the sub catagories
+            for final in entry.split("|"):
+                final_places.append(final)
+    else:
+        line = line.strip()
+        # Checks if there is a valid country, if not return none rather than
+        # an empty list
+        if line:
+            final_places.append(line)
+        else:
+            return None
+
+    return final_places
+
+
+def get_val(line):
+    '''
+    accepts a line and returns the value after the equals sign
+    '''
+    return line.split("=", 1)[1]
 
 
 class person_info_box:
@@ -165,23 +218,23 @@ class person_info_box:
     def addLine(self, line):
         self.boxText += line
         if person_info_box.re_birth_date.search(line):
-            self.birth_date = extract_box_date(line.split("=", 1)[1])
+            self.birth_date = extract_box_date(get_val(line))
 
         elif person_info_box.re_birth_place.search(line):
-            self.birth_place = None
+            self.birth_place = extract_box_location(get_val(line))
             # print(line)
 
         elif person_info_box.re_death_date.search(line):
-            self.death_date = extract_box_date(line.split("=", 1)[1])
+            self.death_date = extract_box_date(get_val(line))
 
         elif person_info_box.re_death_place.search(line):
-            self.death_place = None
+            self.death_place = extract_box_location(get_val(line))
 
         elif person_info_box.re_religion.search(line):
-            self.religion = extract_box_religion(line.split("=", 1)[1])
+            self.religion = extract_box_religion(get_val(line))
 
-        elif person_info_box.re_party.search(line):
-            self.party = None
+        # elif person_info_box.re_party.search(line):
+        #     self.party = print(line.encode("utf-8"))
 
         elif "{{Infobox" in line:
             subject = extractBoxSubject(line)
@@ -193,15 +246,19 @@ class person_info_box:
         closes a box by tying up by saving it to the databse
         and linking the person with the db
 
+        record what we throw out.
+
         :return: none
         :accepts: none
         :raises: boxInvalidError
         '''
-        # print(self.subject)
-        # print(self.death_date)
-        # print(self.birth_date)
-        # raise Exception("Close unimplemented")
-        pass
+        if self.religion and (self.birth_place or self.death_place) and (self.birth_date or self.death_date):
+            print("valid")
+            print(self.religion)
+            print(self.birth_place)
+        else:
+            pass
+            # TODO: raise boxInvalidError()
 
 
 onDoc = 0
@@ -216,6 +273,7 @@ for line in f:
     line = line.decode("utf-8")
     if '<page>' in line:
         onPage = True
+        onInfoBox = False  # Is this nessiary
     elif '</page>' in line:
         onPage = False
     if onPage:
