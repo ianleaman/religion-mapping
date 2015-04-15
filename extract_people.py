@@ -5,6 +5,10 @@ death_date
 death_place
 religion
 party
+
+TODO:
+    how should we best track errors?
+    build religion list while processing
 '''
 
 import bz2
@@ -27,6 +31,77 @@ django.setup()
 # End Initialize
 
 
+# #######################################################
+#
+#                   Helper Functions
+#
+# #######################################################
+def isInt(s):
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False
+
+
+def find_between(s, first, last):
+    '''
+    Returns the first occurence of the substring in s that occurs
+    between the strings first and last.
+    :params:
+        :s: The full string to search
+        :first: The starting character to check
+        :last: The ending character to check
+    '''
+    try:
+        start = s.index(first) + len(first)
+        end = s.index(last, start)
+        return s[start:end]
+    except ValueError:
+        return ""
+
+
+def find_all_between(s, first, last):
+    '''
+    Returns the all the occurences of the substrings in s that occur
+    between the strings first and last.
+    :params:
+        :s: The full string to search
+        :first: The starting character to check
+        :last: The ending character to check
+    '''
+    occurences = []
+    while not len(s) == 0:
+        try:
+            start = s.index(first) + len(first)
+            end = s.index(last, start)
+            occurences.append(s[start:end])
+            s = s[end:]
+        except ValueError:
+            break
+    return occurences
+
+
+def find_between_test():
+    pass
+
+
+def find_all_between_test():
+    test_str = "[[bet (letter)|bet]]-[[ayin]]-[[lamedh]]"
+    l = find_all_between(test_str, "[[", "]]")
+    if not len(l) == 2:
+        print("Test Failed")
+
+    test_str2 = "[[some text]]"
+    test_str3 = "[[some text}}"
+    test_str4 = "a"
+# #######################################################
+#
+#                   End Helper Functions
+#
+# #######################################################
+
+
 def extractBoxSubject(boxHeader):
     postIbox = boxHeader.split("{{Infobox", 1)[-1]
     subject = re.split("&|\||{|{{", postIbox, 1)[0]
@@ -39,9 +114,31 @@ def extract_box_date(line, subject=None):
     :params:
         :line: the string containing the line with the date
     '''
-    print(line)
+    year = None
+    line = line.strip()
+    # Check case one
+    if ("{{" in line) and ("}}" in line):
+        linesplit = line.strip("}").strip("{").split("|")
+        # print(linesplit)
+        for entry in linesplit:
+            if isInt(entry):
+                year = int(entry)
+                break
 
-    return None
+    return year
+
+
+def extract_box_religion(line):
+    '''
+    casses:
+        1) just religion name
+        2) [[link]]
+        3) [[link | link]]
+        4) [[link]] some text [[link]]
+
+    '''
+    line = line.replace("}", "").replace("{", "")
+    print(line, find_all_between(line, "[[", "]]"))
 
 
 class person_info_box:
@@ -72,6 +169,7 @@ class person_info_box:
 
         elif person_info_box.re_birth_place.search(line):
             self.birth_place = None
+            # print(line)
 
         elif person_info_box.re_death_date.search(line):
             self.death_date = extract_box_date(line.split("=", 1)[1])
@@ -80,7 +178,7 @@ class person_info_box:
             self.death_place = None
 
         elif person_info_box.re_religion.search(line):
-            self.religion = None
+            self.religion = extract_box_religion(line.split("=", 1)[1])
 
         elif person_info_box.re_party.search(line):
             self.party = None
@@ -100,8 +198,10 @@ class person_info_box:
         :raises: boxInvalidError
         '''
         # print(self.subject)
-        pass
+        # print(self.death_date)
+        # print(self.birth_date)
         # raise Exception("Close unimplemented")
+        pass
 
 
 onDoc = 0
