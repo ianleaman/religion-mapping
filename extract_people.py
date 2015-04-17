@@ -6,6 +6,7 @@ death_place
 religion
 party
 
+
 TODO:
     - how should we best track errors?
     - build religion list while processing
@@ -84,6 +85,10 @@ def find_all_between(s, first, last):
             s = s[end:]
         except ValueError:
             break
+
+    if not occurences:
+        return None
+
     return occurences
 
 
@@ -133,34 +138,7 @@ def extract_box_date(line, subject=None):
     return year
 
 
-def extract_box_religion(line):
-    '''
-    cases:
-        1) just religion name
-        2) [[link]]
-        3) [[link | link]]
-        4) [[link]] some text [[link]]
-
-    '''
-    final_religions = []
-    if "[[" in line:
-        for entry in find_all_between(line, "[[", "]]"):
-            # Split along the sub catagories
-            for final in entry.split("|"):
-                final_religions.append(final)
-    else:
-        line = line.strip()
-        # Checks if there is a valid religion, if not return none rather than
-        # an empty list
-        if line:
-            final_religions.append(line)
-        else:
-            return None
-
-    return final_religions
-
-
-def extract_box_location(line):
+def extract_line_links(line):
     '''
     cases:
         1) just place name
@@ -169,22 +147,22 @@ def extract_box_location(line):
         4) [[link]] some text [[link]]
 
     '''
-    final_places = []
+    final_links = []
     if "[[" in line:
         for entry in find_all_between(line, "[[", "]]"):
             # Split along the sub catagories
             for final in entry.split("|"):
-                final_places.append(final)
+                final_links.append(final)
     else:
         line = line.strip()
         # Checks if there is a valid country, if not return none rather than
         # an empty list
         if line:
-            final_places.append(line)
+            final_links.append(line)
         else:
             return None
 
-    return final_places
+    return final_links
 
 
 def get_val(line):
@@ -221,20 +199,19 @@ class person_info_box:
             self.birth_date = extract_box_date(get_val(line))
 
         elif person_info_box.re_birth_place.search(line):
-            self.birth_place = extract_box_location(get_val(line))
-            # print(line)
+            self.birth_place = extract_line_links(get_val(line))
 
         elif person_info_box.re_death_date.search(line):
             self.death_date = extract_box_date(get_val(line))
 
         elif person_info_box.re_death_place.search(line):
-            self.death_place = extract_box_location(get_val(line))
+            self.death_place = extract_line_links(get_val(line))
 
         elif person_info_box.re_religion.search(line):
-            self.religion = extract_box_religion(get_val(line))
+            self.religion = extract_line_links(get_val(line))
 
-        # elif person_info_box.re_party.search(line):
-        #     self.party = print(line.encode("utf-8"))
+        elif person_info_box.re_party.search(line):
+            self.party = extract_line_links(get_val(line))
 
         elif "{{Infobox" in line:
             subject = extractBoxSubject(line)
@@ -243,7 +220,7 @@ class person_info_box:
 
     def close(self):
         '''
-        closes a box by tying up by saving it to the databse
+        closes a box by saving it to the databse
         and linking the person with the db
 
         record what we throw out.
@@ -252,13 +229,18 @@ class person_info_box:
         :accepts: none
         :raises: boxInvalidError
         '''
-        if self.religion and (self.birth_place or self.death_place) and (self.birth_date or self.death_date):
-            print("valid")
-            print(self.religion)
-            print(self.birth_place)
+        # Push out to box is valid function
+        if self._isValid():
+            # print([x.encode("utf-8") for x in self.birth_place])
+            print(self.party)
+            # pass
         else:
             pass
             # TODO: raise boxInvalidError()
+
+    def _isValid(self):
+        return (self.religion and (self.birth_place or self.death_place) and
+                (self.birth_date or self.death_date))
 
 
 onDoc = 0
