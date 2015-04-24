@@ -2,74 +2,111 @@ import re
 import sys
 
 
-NAME_KEYS = ["en_name", "conventional_long_name", "official_name", "native_name", "other_name", "name"]
+# ########### Initialize DB for use #########################
+from config import config
+from django.conf import settings as django_settings
+import django
+django_settings.configure(DATABASES=config.DATABASES,
+                          INSTALLED_APPS=("schema", ), DEBUG=False)
+django.setup()
+# End Initialize
+
+from schema.models import Loc_Name, Location
+
+
+
+
+NAME_KEYS = ["en_name", "conventional_long_name", "official_name", "native_name", "other_name", "common_name", "name"]
 
 LAT_LON_KEYS = ["latd", "latm", "lats", "latns", "longd", "longm", "longs", "longew", "lat", "lon"]
 
 COORD_KEYS = ["coor", "coord"]
 
 
-    def loc_dict(info_box):
-        loc_dict = {}
-        box_fields = box.split("\n")
+def add_loc(info_box):
+    loc_dict = {}
+    box_fields = info_box.split("\n")
 
-        for line in box_fields:
-            # extract name of location
-            for name_key in NAME_KEYS:
-                if name_key in line:
-                    loc_dict[name_key] = name_from_line(line)
-            # extract lat/lon coords of location
-            for latlon_key in LAT_LON_KEYS:
-                if latlon_key in line:
-                    loc_dict[latlon_key] = latlon_for_key(latlon_key, line)
-            # extract coordinate block
-            for coord_key in COORD_KEYS:
-                if coord_key in line:
-                    coord_dict = coord_dict(line)
-                    #  add items in coord dictionary to loc_dict
-                    loc_dict = merge_dicts(loc_dict, coord_dict)
+    for line in box_fields:
 
-        latdd, londd = dd_coords(loc_dict)
-        if latdd and londd and has_name(loc_dict):
-            create_loc_obj(loc_dict)
-        else:
-            raise..
+        # extract name of location
+        for name_key in NAME_KEYS:
+            n = '|' + name_key
+            if n in line:
+                loc_dict[name_key] = name_from_line(line)
 
-    def create_loc_obj():
+        # extract lat/lon coords of location
+        for latlon_key in LAT_LON_KEYS:
+            if latlon_key in line:
+                loc_dict[latlon_key] = latlon_for_key(latlon_key, line)
 
+        # extract coordinate block
+        for coord_key in COORD_KEYS:
+            if coord_key in line:
+                coord_dict = coord_dict(line)
+                #  add items in coord dictionary to loc_dict
+                loc_dict = merge_dicts(loc_dict, coord_dict)
 
-    def has_name(loc_dict):
-        has_name = False
-        for name in NAME_KEYS:
-            if loc_dict[name] is not None:
-                has_name = True
-                break
-        return has_name
+    latdd, londd = dd_coords(loc_dict)
+    if latdd and londd and has_name(loc_dict):
+        loc_dict["latdd"] = latdd
+        loc_dict["londd"] = londd
+        create_loc_obj(loc_dict)
 
-    def dd_coords(loc_dict):
-        latd = loc_dict["latd"]
-        latm = zero_if_none(loc_dict["latm"])
-        lats = zero_if_none(loc_dict["lats"])
+def test_add_loc():
+    f = open('/Users/jasonkrone/Developer/text_mining/data/peru.txt', 'r')
+    loc_box = ''
+    for line in f:
+        loc_box += line
+    d = add_loc(loc_box)
+    print(d)
 
-        longd = loc_dict["longd"]
-        longm = zero_if_none(loc_dict["longm"])
-        longs = zero_if_none(loc_dict["longs"])
+def merge_dicts(dict_a, dict_b):
+    for key, val in dict_b.items():
+        dict_a[key] = val
+    return dict_a
 
-        if latd is not None and longd is not None:
-            latdd = decimal_degrees(latd, latm, lats)
-            longdd = decimal_degrees(longd, longm, longs)
-            return latdd, longdd
-        else:
-            return None, None
+def create_loc_obj(loc):
+    names = []
+    location = Location.objects.get_or_create(lat=loc["latdd"], lon=loc["londd"])
 
-    def decimal_degrees(d, m, s):
-        return d + m/60.0 + s/3600.0
+    for name_type in NAME_KEYS:
+        name = loc[name_type]
+        if name is not None:
+            Loc_Name(name=name, name_type=name_type, location=location)
 
-    def zero_if_none(val):
-        if val is None:
-            return 0
-        else:
-            return val
+def has_name(loc_dict):
+    has_name = False
+    for name in NAME_KEYS:
+        if loc_dict.get(name) is not None:
+            has_name = True
+            break
+    return has_name
+
+def dd_coords(loc_dict):
+    latd = loc_dict["latd"]
+    latm = zero_if_none(loc_dict.get("latm"))
+    lats = zero_if_none(loc_dict.get("lats"))
+
+    longd = loc_dict["longd"]
+    longm = zero_if_none(loc_dict.get("longm"))
+    longs = zero_if_none(loc_dict.get("longs"))
+
+    if latd is not None and longd is not None:
+        latdd = decimal_degrees(latd, latm, lats)
+        longdd = decimal_degrees(longd, longm, longs)
+        return latdd, longdd
+    else:
+        return None, None
+
+def decimal_degrees(d, m, s):
+    return d + m/60.0 + s/3600.0
+
+def zero_if_none(val):
+    if val is None:
+        return 0
+    else:
+        return val
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                                                                             #
@@ -77,19 +114,18 @@ COORD_KEYS = ["coor", "coord"]
 #                                                                             #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-    def name_from_line(line):
+def name_from_line(line):
+    name = None
+    key_value = line.split("=", 1)
+    if len(key_value) == 2:  # check that the line had both key and value
+        dirty_name = key_value[1]
+        name = re.split("&|\||{|{{", dirty_name, 1)[0]  # exclude nonsense
+        name = name.strip()
+    else:
+        print("ERRROR_bad_name_line")  # TODO COUNT BAD
+    if name == "":
         name = None
-        key_value = line.split("=", 1)
-        if len(key_value) == 2:  # check that the line had both key and value
-            dirty_name = key_value[1]
-            name = re.split("&|\||{|{{", dirty_name, 1)[0]  # exclude nonsense
-            name = name.strip()
-        else:
-            print("ERRROR_bad_name_line")  # TODO COUNT BAD
-        if name == "":
-            name = None
-        return name
-
+    return name
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -98,50 +134,49 @@ COORD_KEYS = ["coor", "coord"]
 #                                                                             #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-    def latlon_for_key(latlon_key, line):
-        """
-        returns the value under the given lat/lon key (ex. latd, latm, lats, latns)
-        """
-        latlon_for_key = None
-        coord_array = filter(None, line.split("|"))  # bar separates keyvalue pairs
-        coord_pairs = [pair.split("=") for pair in coord_array]
+def latlon_for_key(latlon_key, line):
+    """
+    returns the value under the given lat/lon key (ex. latd, latm, lats, latns)
+    """
+    latlon_for_key = None
+    coord_array = filter(None, line.split("|"))  # bar separates keyvalue pairs
+    coord_pairs = [pair.split("=") for pair in coord_array]
 
-        for pair in coord_pairs:
-            if len(pair) == 2:
-                key = pair[0].strip()
-                value = pair[1].strip()
-                if key == latlon_key and is_coord_str(value):
-                    latlon_for_key = value
-        return latlon_for_key
+    for pair in coord_pairs:
+        if len(pair) == 2:
+            key = pair[0].strip()
+            value = pair[1].strip()
+            if key == latlon_key and is_coord_str(value):
+                latlon_for_key = float(value)
+    return latlon_for_key
 
-    def is_coord_str(coord):
-        """
-        returns True if the given string is a valid representation of a dms
-        coordniate value or cardinal direction.  Otherwise, returns False
-        """
+def is_coord_str(coord):
+    """
+    returns True if the given string is a valid representation of a dms
+    coordniate value or cardinal direction.  Otherwise, returns False
+    """
 
-        is_valid = False
-        if coord in ["n", "s", "e", "w"]:
+    is_valid = False
+    if coord in ["n", "s", "e", "w"]:
+        is_valid = True
+    elif is_numeric_str(coord):
+        if -180 <= floatify(coord) and floatify(coord) <= 180:
             is_valid = True
-        elif is_numeric_str(coord):
-            if -180 <= intify(coord) and intify(coord) <= 180:
-                is_valid = True
-        return is_valid
+    return is_valid
 
-    def is_numeric_str(val):
-        """
-        returns true if the given value is a numeric string and false otherwise
-        """
+def is_numeric_str(val):
+    """
+    returns true if the given value is a numeric string and false otherwise
+    """
 
-        is_numeric_str = False
-        if isinstance(val, str):
-            try:
-                num = int(val)
-                is_numeric = True
-            except ValueError:
-                pass
-        else:
-            return is_numeric_str
+    is_num_str = False
+    if isinstance(val, str):
+        try:
+            num = float(val)
+            is_num_str = True
+        except ValueError:
+            pass
+    return is_num_str
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -150,108 +185,106 @@ COORD_KEYS = ["coor", "coord"]
 #                                                                             #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-    LAT_KEYS = ["latd", "latm", "lats"]
-    LON_KEYS = ["longd", "longm", "longs"]
+LAT_KEYS = ["latd", "latm", "lats"]
+LON_KEYS = ["longd", "longm", "longs"]
 
+def coord_dict(line):
+    """"
+    creates a coordinate dictionary with keys: latd, latm, lats, latns, longd, longm, longs, longew
+    from the given line
+    """
 
-    def coord_dict(line):
-        """"
-        creates a coordinate dictionary with keys: latd, latm, lats, latns, longd, longm, longs, longew
-        from the given line
-        """
+    coord_dict = {}
+    lats, lons = extract_lats_lons(line)
+    if lats is not None and lons is not None:
+        coord_dict = insert_vals_at_keys(coord_dict, LAT_KEYS, lats, is_float, "latns")
+        coord_dict = insert_vals_at_keys(coord_dict, LON_KEYS, lons, is_float, "longew")
+    else:
+        print("Issue in coord_dict()")
+        coord_dict = None
+    return coord_dict
 
-        coord_dict = {}
-        lats, lons = extract_lats_lons(line)
-        if lats is not None and lons is not None:
-            coord_dict = insert_vals_at_keys(coord_dict, LAT_KEYS, lats, is_int, "latns")
-            coord_dict = insert_vals_at_keys(coord_dict, LON_KEYS, lons, is_int, "longew")
+def insert_vals_at_keys(a_dict, keys, vals, is_valid, invalid_key):
+    """
+    Inserts the given values under the given keys in the order they appear in
+    the given lists if the values are vaild. If a value is not vaild, it is
+    inserted into the dictionary under the invalid key. Modified dictionary is
+    returned
+    """
+
+    key_iter = keys.__iter__()
+
+    for val in vals:
+        if is_valid(val):
+            key = key_iter.next()
+            a_dict[key] = val
         else:
-            print("Issue in coord_dict()")
-            coord_dict = None
-        return coord_dict
+            a_dict[invalid_key] = val
+    return a_dict
 
+def is_float(val):
+    if isinstance(val, float):
+        return True
+    else:
+        return False
 
-    def insert_vals_at_keys(a_dict, keys, vals, is_valid, invalid_key):
-        """
-        Inserts the given values under the given keys in the order they appear in
-        the given lists if the values are vaild. If a value is not vaild, it is
-        inserted into the dictionary under the invalid key. Modified dictionary is
-        returned
-        """
+def extract_lats_lons(line):
+    """
+    returns a tuple containing a list of the latitude values
+    and longitude values in the given line if those values are present.
+    Otherwise returns None.
+    """
 
-        key_iter = keys.__iter__()
+    lats = None
+    lons = None
+    coords = coord_vals_from_text(line)
+    if coords is not None:
+        length = len(coords)
+        first_half = [floatify(coord) for coord in coords[0:length/2]]
+        second_half = [floatify(coord) for coord in coords[length/2:]]
+        if "n" in first_half or "s" in first_half:
+            lats = first_half
+            lons = second_half
+        elif "e" in first_half or "w" in first_half:
+            lats = second_half
+            lons = first_half
+    return lats, lons
 
-        for val in vals:
-            if is_valid(val):
-                key = key_iter.next()
-                a_dict[key] = val
-            else:
-                a_dict[invalid_key] = val
-        return a_dict
+def coord_vals_from_text(line):
+    """
+    Returns a list of coordinate values in the given line, if the line contains
+    valid coordinates.  Otherwise, returns None
+    """
 
-    def is_int(val):
-        if isinstance(val, int):
-            return True
-        else:
-            return False
-
-    def extract_lats_lons(line):
-        """
-        returns a tuple containing a list of the latitude values
-        and longitude values in the given line if those values are present.
-        Otherwise returns None.
-        """
-
-        lats = None
-        lons = None
-        coords = coord_vals_from_text(line)
-        if coords is not None:
-            length = len(coords)
-            first_half = [intify(coord) for coord in coords[0:length/2]]
-            second_half = [intify(coord) for coord in coords[length/2:]]
-            if "n" in first_half or "s" in first_half:
-                lats = first_half
-                lons = second_half
-            elif "e" in first_half or "w" in first_half:
-                lats = second_half
-                lons = first_half
-        return lats, lons
-
-    def coord_vals_from_text(line):
-        """
-        Returns a list of coordinate values in the given line, if the line contains
-        valid coordinates.  Otherwise, returns None
-        """
-
+    coord_vals = None
+    try:
+        coord_text = re.search("{ *{ *coord(.*)\|", line).group(1)
+        print(coord_text)
+    except AttributeError:
+        print("Error parsing coord text")
+        return None
+    # values are separated by |
+    coords_dirty = coord_text.split("|")
+    # get rid of lines filled with only spaces or empty sting
+    coords_dirty = filter(None, [coord.strip() for coord in coords_dirty])
+    coords_clean = [coord for coord in coords_dirty if is_coord_str(coord)]
+    # convert strings to values
+    coord_vals = [floatify(coord) for coord in coords_clean]
+    if len(coord_vals) % 2 != 0:  # bad coord vals
         coord_vals = None
-        try:
-            coord_text = re.search("{ *{ *coord(.*)\|", line).group(1)
-            print(coord_text)
-        except AttributeError:
-            print("Error parsing coord text")
-            return None
-        # values are separated by |
-        coords_dirty = coord_text.split("|")
-        # get rid of lines filled with only spaces or empty sting
-        coords_dirty = filter(None, [coord.strip() for coord in coords_dirty])
-        coords_clean = [coord for coord in coords_dirty if is_coord_str(coord)]
-        # convert strings to values
-        coord_vals = [intify(coord) for coord in coords_clean]
-        if len(coord_vals) % 2 != 0:  # bad coord vals
-            coord_vals = None
-        return coord_vals
+    return coord_vals
 
-    def intify(val):
-        """
-        returns the given value cast as an int if no exception is thrown.
-        Otherwise, returns given value
-        """
+def floatify(val):
+    """
+    returns the given value cast as an float if no exception is thrown.
+    Otherwise, returns given value
+    """
 
-        try:
-            num = int(val)
-            return num
-        except ValueError:
-            return val
+    try:
+        num = float(val)
+        return num
+    except ValueError:
+        return val
 
 
 
@@ -281,9 +314,9 @@ def test_coord_vals():
     line2 = "|coor          ={{Coord|36|0|4|N|78|56|20|W|type:edu_region:US-NC|display=inline,title}}".lower()
     line3 = "| coordinates {{Coord|0|900|S|90|33|W|scale:1400000|display=inline,title}}".lower()
 
-    coordv1 = coord_vals(line1)
-    coordv2 = coord_vals(line2)
-    coordv3 = coord_vals(line3)
+    coordv1 = coord_vals_from_text(line1)
+    coordv2 = coord_vals_from_text(line2)
+    coordv3 = coord_vals_from_text(line3)
 
     correctv1 = [0, 40, "s", 90, 33, "w"]
     correctv2 = [36, 0, 4, "n", 78, 56, 20, "w"]
@@ -439,74 +472,75 @@ def name_from_line_test():
 
 def test_is_valid_coord():
 
-    if is_valid_coord("n"):
+    if is_coord_str("n"):
         print("Passed")
     else:
         print("Error1")
 
-    if is_valid_coord("s"):
+    if is_coord_str("s"):
         print("Passed")
     else:
         print("Error2")
-    if is_valid_coord("e"):
+    if is_coord_str("e"):
         print("Passed")
     else:
         print("Error3")
 
-    if is_valid_coord("w"):
+    if is_coord_str("w"):
         print("Passed")
     else:
         print("Error4")
 
-    if not is_valid_coord("x"):
+    if not is_coord_str("x"):
         print("Passed")
     else:
         print("Error5")
 
-    if not is_valid_coord("?"):
+    if not is_coord_str("?"):
         print("Passed")
     else:
         print("Error6")
 
-    if is_valid_coord("180"):
+    if is_coord_str("180"):
         print("Passed")
     else:
         print("Error7")
-    if is_valid_coord("-180"):
+
+    if is_coord_str("-180"):
         print("Passed")
     else:
         print("Error8")
 
-    if is_valid_coord("0"):
+    if is_coord_str("0"):
         print("Passed")
     else:
         print("Error9")
 
-    if is_valid_coord("90"):
+    if is_coord_str("90"):
         print("Passed")
     else:
         print("Error10")
 
-    if is_valid_coord("-90"):
+    if is_coord_str("-90"):
         print("Passed")
     else:
         print("Error11")
 
-    if not is_valid_coord("1000"):
+    if not is_coord_str("1000"):
         print("Passed")
     else:
         print("Error12")
 
-    if not is_valid_coord("-181"):
+    if not is_coord_str("-181"):
         print("Passed")
     else:
         print("Error13")
 
 
 def test_latlon_for_key():
-    lats = "| latd = 51 | latm = 30 | lats = 26  | latNS = N"
-    lons = "| longd = 0 | longm = 7 | longs = 39 | longEW = W"
-    bad_line = "| latd =  | latm =      30 | lats = 26  | latNS = N"
+    lats = "| latd = 51 | latm = 30 | lats = 26  | latNS = N".lower()
+    lons = "| longd = 0 | longm = 7 | longs = 39 | longEW = W".lower()
+    bad_line = "| latd =  | latm =      30 | lats = 26  | latNS = N".lower()
 
     latd1 = latlon_for_key("latd", lats)
     latm1 = latlon_for_key("latm", lats)
@@ -581,10 +615,12 @@ def test_coord_dict():
     else:
         print("Test2 Failed, dict2:", dict2, "not", dict2_correct)
 
-# name_from_line_test()
+#name_from_line_test()
 # decimal_degrees_from_dms_test()
 
-test_coord_vals()
-test_latlon_for_key()
-test_is_valid_coord()
-test_coord_dict()
+#test_coord_vals()
+
+#test_coord_dict()
+#test_latlon_for_key()
+#test_is_valid_coord()
+test_add_loc()
