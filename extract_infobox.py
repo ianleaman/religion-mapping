@@ -20,19 +20,8 @@ django.setup()
 def extractBoxSubject(boxHeader):
     postIbox = boxHeader.split("{{Infobox", 1)[-1]
     subject = re.split("&|\||{|{{", postIbox, 1)[0]
-
     return subject.strip().lower()
 
-
-def processBox(box):
-    #  split newline
-
-    print(box)
-    bfields = box.split("\n")
-    print(bfields)
-    #  pair w/ equals
-    #  remove refs (anything w tag)
-    #  clean out links
 
 onDoc = 0
 brackLevel = 0
@@ -48,7 +37,7 @@ for line in f:
     elif '</page>' in line:
         onPage = False
     if onPage:
-        if "{{Infobox" in line:
+        if "{{Infobox" in line:  # TODO: may have spaces... ect
             bracketSum = 0
             box = ""
             onInfoBox = True
@@ -72,7 +61,6 @@ for line in f:
             # Exit the infobox
             if bracketSum == 0:
                 # print(box.encode("utf-8"))
-                processBox(box)
                 onInfoBox = False
                 i += 1
             # Error Checking

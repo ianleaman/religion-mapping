@@ -6,7 +6,7 @@ from django.db import models
 
 
 class Loc_Name(models.Model):
-    name = models.CharField(max_length=1028, index=True)
+    name = models.CharField(max_length=1028, db_index=True)
     name_type = models.CharField(max_length=1028)
     location = models.ForeignKey('Location')
 
