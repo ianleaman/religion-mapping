@@ -1,6 +1,15 @@
 '''
 Jason Krone and Ian Leaman
 '''
+if not django_settings.configured:
+    # ########### Initialize DB for use #########################
+    from config import config
+    from django.conf import settings as django_settings
+    import django
+    django_settings.configure(DATABASES=config.DATABASES,
+                              INSTALLED_APPS=("schema", ), DEBUG=False)
+    django.setup()
+    # End Initialize
 
 from django.db import models
 
@@ -21,8 +30,8 @@ class Person(models.Model):
     """docstring for ClassName"""
     subject = models.TextField()
     birth_year = models.IntegerField()
-    birth_place = models.ForeignKey('Location')
+    places = models.ManyToManyField('Location')
     death_year = models.IntegerField()
-    death_place = models.ForeignKey('Location')
+    # Change these two to pickle fields?
     religion = models.TextField()
     party = models.TextField()
