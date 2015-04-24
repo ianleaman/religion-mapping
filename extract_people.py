@@ -21,6 +21,10 @@ import bz2
 import re
 import sys
 import re
+import json
+
+from schema.models import *
+
 sys.path.append('..')
 
 f = bz2.open("data\enwiki-20150304-pages-articles-multistream.xml.bz2")
@@ -232,8 +236,15 @@ class person_info_box:
         # Push out to box is valid function
         if self._isValid():
             # print([x.encode("utf-8") for x in self.birth_place])
-            print(self.party)
-            # pass
+            subject = self.subject
+            birth_year = self.birth_year
+            places = None
+            death_year = self.death_year
+            # Change these two to pickle fields?
+            religion = json.dumps(self.religion)
+            party = json.dump(self.party)
+            person = Person(**)
+
         else:
             pass
             # TODO: raise boxInvalidError()
