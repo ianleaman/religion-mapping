@@ -423,11 +423,6 @@ def latlon_format_fix(page):
 """
 
 
-
-    
-
-
-
 def decimal_degrees_from_dms_test():
     """
     |latd=8 |latm= 32|latNS=S |longd=179 |longm=13 |longEW=E
@@ -636,11 +631,37 @@ def test_coord_dict():
         print("Test2 Failed, dict2:", dict2, "not", dict2_correct)
 
 
+pre_list = [
+    (re.compile(r"(long|longitude|lons1)="), "lon="),
+    (re.compile(r"(latitude|lats1)="), "lat="),
+    (re.compile(r"(latitudedegrees|lat_deg|lat_d)="), "latd="),
+    (re.compile(r"(latitudeminutes|lat_min|lat_m)="), "latm="),
+    (re.compile(r"(latitudeseconds|lat_sec)="), "lats="),
+    (re.compile(r"(lat_ns)="), "latns="),
+    (re.compile(r"(longtitudedegrees|longitudedegrees|lon_deg|long_d)="), "longd="),
+    (re.compile(r"(longtitudeminutes|longitudeminutes|lon_min|long_m)="), "longm="),
+    (re.compile(r"(longtitudeseconds|longitudeseconds|lon_sec)="), "long="),
+    (re.compile(r"(long_ew)="), "longew="),
+]
 
 
+def latlon_format_fix(page):
+    for process, subst in pre_list:
+        page = process.sub(subst, page)
+    # page = re.sub(r"\b(long|longitude|lons1)=", "lon=", page)
+    # page = re.sub(r"\b(latitude|lats1)=", "lat=", page)
 
+    # page = re.sub(r"\b(latitudedegrees|lat_deg|lat_d)=", "latd=", page)
+    # page = re.sub(r"\b(latitudeminutes|lat_min|lat_m)=", "latm=", page)
+    # page = re.sub(r"\b(latitudeseconds|lat_sec)=", "lats=", page)
+    # page = re.sub(r"\b(lat_ns)=", "latns=", page)
 
+    # page = re.sub(r"\b(longtitudedegrees|longitudedegrees|lon_deg|long_d)=", "longd=", page)
+    # page = re.sub(r"\b(longtitudeminutes|longitudeminutes|lon_min|long_m)=", "longm=", page)
+    # page = re.sub(r"\b(longtitudeseconds|longitudeseconds|lon_sec)=", "long=", page)
+    # page = re.sub(r"\b(long_ew)=", "longew=", page)
 
+    return page
 
 
 f = bz2.open(config.DATA_PATH)
@@ -674,6 +695,7 @@ for line in f:
                 num_boxes_processed += 1
                 if num_boxes_processed % 100000 == 0:
                     print("processed 100,000")
+                # box = latlon_format_fix(box)
                 if is_location(box):
                     try:
                         add_loc(box)
