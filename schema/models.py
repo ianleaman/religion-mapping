@@ -37,3 +37,4 @@ class Person(models.Model):
     # Change these two to pickle fields?
     religion = models.TextField()
     party = models.TextField()
+    # location = models.ForeignKey('Location')

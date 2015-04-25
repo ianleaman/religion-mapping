@@ -14,6 +14,9 @@ TODO:
         locs appear?
     - refactor get_box_location and get_box_religion
 
+Notes:
+    - Currently only assign one location to a person which is false,
+      can have multiple
 
 '''
 
@@ -22,6 +25,7 @@ import re
 import sys
 import re
 import json
+from geopy.geocoders import Nominatim
 
 from schema.models import *
 
@@ -30,15 +34,9 @@ sys.path.append('..')
 f = bz2.open("data\enwiki-20150304-pages-articles-multistream.xml.bz2")
 
 
-# TODO: Move this to seperate func
-# ########### Initialize DB for use #########################
-from config import config
-from django.conf import settings as django_settings
-import django
-django_settings.configure(DATABASES=config.DATABASES,
-                          INSTALLED_APPS=("schema", ), DEBUG=False)
-django.setup()
-# End Initialize
+geolocator = Nominatim()
+# Create a geographic buffer to reduce network calls
+geo_dict = {}
 
 
 # #######################################################
@@ -46,6 +44,29 @@ django.setup()
 #                   Helper Functions
 #
 # #######################################################
+def get_geocoords(place_list):
+    coords = None
+    # print(place_list)
+    for place in place_list:
+        if place in geo_dict:
+            coords = geo_dict[place]
+        else:
+            coords = geolocator.geocode(place)
+            # coords = 10
+            if coords:
+                geo_dict[place] = coords
+                break
+
+    # print(coords, coords.latitude, coords.longitude)
+    # print("===")
+    # coords = None
+    if coords:
+        return coords.latitude, coords.longitude
+        # return "10.1", "10"
+    else:
+        return None, None
+
+
 def isInt(s):
     try:
         int(s)
@@ -187,6 +208,12 @@ class person_info_box:
     re_religion = re.compile("\| *religion *=")
     re_party = re.compile("\| *party *=")
 
+    class InvalidBox(Exception):
+        pass
+
+    class InvalidGeoTag(Exception):
+        pass
+
     def __init__(self):
         self.boxText = ""
         self.subject = None
@@ -237,21 +264,51 @@ class person_info_box:
         if self._isValid():
             # print([x.encode("utf-8") for x in self.birth_place])
             subject = self.subject
-            birth_year = self.birth_year
-            places = None
-            death_year = self.death_year
+            birth_year = self.birth_date
+            places = []
+
+            # Prioritize death place over birth place
+            if self.death_place:
+                for place in self.death_place:
+                    places.append(place)
+            if self.birth_place:
+                for place in self.birth_place:
+                    places.append(place)
+
+            death_year = self.death_date
             # Change these two to pickle fields?
             religion = json.dumps(self.religion)
-            party = json.dump(self.party)
-            person = Person(**)
+            party = json.dumps(self.party)
 
+            lat, lon = get_geocoords(places)
+            loc = None
+            print(lat, lon)
+            if lat and lon:
+                loc = Location(lat=lat, lon=lon)
+            else:
+                raise person_info_box.InvalidGeoTag()
+
+            person = Person(subject=subject, birth_year=birth_year,
+                            death_year=death_year, religion=religion,
+                            party=party)
+            loc.save()
+            person.save()
+            person.places = [loc]
+            person.save()
+            # print(geolocator.geocode)
+            # person = Person(**)
         else:
+            # print("Invalid Loop")
+            raise person_info_box.InvalidBox()
             pass
             # TODO: raise boxInvalidError()
 
     def _isValid(self):
         return (self.religion and (self.birth_place or self.death_place) and
                 (self.birth_date or self.death_date))
+
+    def _isValidWithLoc(self):
+        return
 
 
 onDoc = 0
@@ -261,31 +318,63 @@ onInfoBox = False
 box = ""
 bracketSum = 0
 box = None
+# Box Counter
 i = 0
-for line in f:
-    line = line.decode("utf-8")
-    if '<page>' in line:
-        onPage = True
-        onInfoBox = False  # Is this nessiary
-    elif '</page>' in line:
-        onPage = False
-    if onPage:
-        if "{{Infobox" in line:
-            box = person_info_box()
-            bracketSum = 0
-            onInfoBox = True
+# Keep track of last Boxes
+lastBox = 0
 
-        if onInfoBox:
-            bracketSum += line.count("{{") - line.count("}}")
-            box.addLine(line)
-            # Exit the infobox
-            if bracketSum == 0:
-                box.close()
-                onInfoBox = False
-                i += 1
-            # Error Checking
-            elif brackLevel < 0:
-                raise Exception("Something went wrong in "
-                                "finding the end of an infobox")
+numValid = 0
+numInValid = 0
+numGeoInvalid = 0
+try:
+    for line in f:
+        # A way to resume from abrupt stops
+        if i < lastBox:
+            continue
+        line = line.decode("utf-8")
+        if '<page>' in line:
+            onPage = True
+            onInfoBox = False  # Is this nessiary
+        elif '</page>' in line:
+            onPage = False
+        if onPage:
+            if "{{Infobox" in line:
+                box = person_info_box()
+                bracketSum = 0
+                onInfoBox = True
+
+            if onInfoBox:
+                bracketSum += line.count("{{") - line.count("}}")
+                box.addLine(line)
+                # Exit the infobox
+                if bracketSum == 0:
+                    try:
+                        box.close()
+                        numValid += 1
+                    except UnicodeDecodeError:
+                        print("error decode")
+                    except UnicodeEncodeError:
+                        print("error encode")
+                    except person_info_box.InvalidBox:
+                        numInValid += 1
+                    except person_info_box.InvalidGeoTag:
+                        numGeoInvalid += 1
+
+                    onInfoBox = False
+                    i += 1
+
+                    # Progress Report
+                    if i % 100 == 0:
+                        print("Boxes Scanned: [", i, "] [", numValid, "/",
+                              numInValid, "/", numGeoInvalid, "]")
+                    if i >= 101:
+                        break
+                # Error Checking
+                elif brackLevel < 0:
+                    raise Exception("Something went wrong in "
+                                    "finding the end of an infobox")
+except Exception as e:
+    print(e)
+    print("Last Box:\n\n", i, "\n\n")
 
 f.close()
