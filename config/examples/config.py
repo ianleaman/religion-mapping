@@ -20,6 +20,7 @@ DATABASES = {
 
 SECRET_KEY = 'this_is_secret!'
 
+DATA_PATH = "path_to_wiki_data"
 
 # DATABASES = {
 #     'default': {
