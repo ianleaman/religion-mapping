@@ -635,10 +635,6 @@ def test_coord_dict():
     else:
         print("Test2 Failed, dict2:", dict2, "not", dict2_correct)
 
-
-<<<<<<< HEAD
-f = bz2.open(DATA_PATH + "enwiki-20150304-pages-articles-multistream.xml.bz2")
-=======
 pre_list = [
     (re.compile(r"(long|longitude|lons1)="), "lon="),
     (re.compile(r"(latitude|lats1)="), "lat="),
@@ -673,7 +669,6 @@ def latlon_format_fix(page):
 
 
 f = bz2.open(config.DATA_PATH)
->>>>>>> 3c98b43e2c5841a8b2be98f89d09ed55d96b50ae
 
 NON_LOC_UNUSABLE = 0
 onDoc = 0
@@ -702,9 +697,10 @@ for line in f:
             # Exit the infobox
             if bracketSum == 0:
                 num_boxes_processed += 1
-                if num_boxes_processed % 100000 == 0:
+                if num_boxes_processed % 10000 == 0:
                     print("processed 100,000")
-                # box = latlon_format_fix(box)
+                box = box.lower()
+                box = latlon_format_fix(box)
                 if is_location(box):
                     try:
                         add_loc(box)
@@ -726,7 +722,6 @@ f.close()
 
 #name_from_line_test()
 # decimal_degrees_from_dms_test()
-test_decimal_degrees()
 #test_coord_vals()
 
 #test_coord_dict()
