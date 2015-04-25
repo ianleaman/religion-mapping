@@ -1,10 +1,12 @@
 '''
 Jason Krone and Ian Leaman
 '''
+
+from django.conf import settings as django_settings
+
 if not django_settings.configured:
     # ########### Initialize DB for use #########################
     from config import config
-    from django.conf import settings as django_settings
     import django
     django_settings.configure(DATABASES=config.DATABASES,
                               INSTALLED_APPS=("schema", ), DEBUG=False)

@@ -1,26 +1,46 @@
 import re
 import sys
-
-
-# ########### Initialize DB for use #########################
-from config import config
-from django.conf import settings as django_settings
-import django
-django_settings.configure(DATABASES=config.DATABASES,
-                          INSTALLED_APPS=("schema", ), DEBUG=False)
-django.setup()
-# End Initialize
+import bz2
 
 from schema.models import Loc_Name, Location
 
 
+NAME_KEYS = {"en_name": re.compile("\| *en_name *="),
+             "conventional_long_name": re.compile("\| *conventional_long_name *="),
+             "official_name": re.compile("\| *official_name *="),
+             "native_name": re.compile("\| *native_name *="),
+             "other_name": re.compile("\| *other_name *="),
+             "common_name": re.compile("\| *common_name *="),
+             "name": re.compile("\| *name *=")
+             }
+
+LAT_LON_KEYS = {"latd": re.compile("\| *latd *="),
+                "latm": re.compile("\| *latm *="),
+                "lats": re.compile("\| *lats *="),
+                "latns": re.compile("\| *latns *="),
+                "longd": re.compile("\| *longd *="),
+                "longm": re.compile("\| *longm *="),
+                "longs": re.compile("\| *longs *="),
+                "longew": re.compile("\| *longew *="),
+                "lat": re.compile("\| *lat *="),
+                "lon": re.compile("\| *lon *="),
+                }
+
+COORD_KEYS = {"coor": re.compile("\| *coor *="),
+              "coord": re.compile("\| *coord *=")
+              }
 
 
-NAME_KEYS = ["en_name", "conventional_long_name", "official_name", "native_name", "other_name", "common_name", "name"]
 
-LAT_LON_KEYS = ["latd", "latm", "lats", "latns", "longd", "longm", "longs", "longew", "lat", "lon"]
 
-COORD_KEYS = ["coor", "coord"]
+def is_location(box):
+    for latlon_key in LAT_LON_KEYS:
+        if latlon_key in box:
+            return True
+    for coord_key in COORD_KEYS:
+        if coord_key in box:
+            return True
+    return False
 
 
 def add_loc(info_box):
@@ -28,21 +48,19 @@ def add_loc(info_box):
     box_fields = info_box.split("\n")
 
     for line in box_fields:
-
         # extract name of location
-        for name_key in NAME_KEYS:
-            n = '|' + name_key
-            if n in line:
+        for name_key, regex in NAME_KEYS.items():
+            if regex.search(line):
                 loc_dict[name_key] = name_from_line(line)
 
         # extract lat/lon coords of location
-        for latlon_key in LAT_LON_KEYS:
-            if latlon_key in line:
+        for latlon_key, regex in LAT_LON_KEYS.items():
+            if regex.search(line):
                 loc_dict[latlon_key] = latlon_for_key(latlon_key, line)
 
         # extract coordinate block
-        for coord_key in COORD_KEYS:
-            if coord_key in line:
+        for coord_key, regex in COORD_KEYS.items():
+            if regex.search(line):
                 coord_dict = coord_dict(line)
                 #  add items in coord dictionary to loc_dict
                 loc_dict = merge_dicts(loc_dict, coord_dict)
@@ -52,14 +70,15 @@ def add_loc(info_box):
         loc_dict["latdd"] = latdd
         loc_dict["londd"] = londd
         create_loc_obj(loc_dict)
+    else:
+        raise Exception('Bad_Loc_Box')
 
 def test_add_loc():
     f = open('/Users/jasonkrone/Developer/text_mining/data/peru.txt', 'r')
     loc_box = ''
     for line in f:
         loc_box += line
-    d = add_loc(loc_box)
-    print(d)
+    add_loc(loc_box)
 
 def merge_dicts(dict_a, dict_b):
     for key, val in dict_b.items():
@@ -68,12 +87,13 @@ def merge_dicts(dict_a, dict_b):
 
 def create_loc_obj(loc):
     names = []
-    location = Location.objects.get_or_create(lat=loc["latdd"], lon=loc["londd"])
-
+    location = Location.objects.get_or_create(lat=loc["latdd"], lon=loc["londd"])[0]
     for name_type in NAME_KEYS:
-        name = loc[name_type]
+        name = loc.get(name_type)
         if name is not None:
-            Loc_Name(name=name, name_type=name_type, location=location)
+            loc_name = Loc_Name(name=name, name_type=name_type, location=location)
+            loc_name.save()
+
 
 def has_name(loc_dict):
     has_name = False
@@ -615,6 +635,65 @@ def test_coord_dict():
     else:
         print("Test2 Failed, dict2:", dict2, "not", dict2_correct)
 
+
+
+
+
+
+
+
+
+f = bz2.open("/Users/jasonkrone/Developer/text_mining/enwiki-20150304-pages-articles-multistream.xml.bz2")
+
+NON_LOC_UNUSABLE = 0
+onDoc = 0
+brackLevel = 0
+onPage = False
+onInfoBox = False
+box = ""
+num_boxes_processed = 0
+bracketSum = 0
+i = 0
+for line in f:
+    line = line.decode("utf-8")
+    if '<page>' in line:
+        onPage = True
+        onInfoBox = False  # Is this nessiary
+    elif '</page>' in line:
+        onPage = False
+    if onPage:
+        if "{{Infobox" in line:
+            bracketSum = 0
+            onInfoBox = True
+
+        if onInfoBox:
+            bracketSum += line.count("{{") - line.count("}}")
+            box += line
+            # Exit the infobox
+            if bracketSum == 0:
+                num_boxes_processed += 1
+                if num_boxes_processed % 100000 == 0:
+                    print("processed 100,000")
+                if is_location(box):
+                    try:
+                        add_loc(box)
+                    except:
+                        NON_LOC_UNUSABLE += 1
+                onInfoBox = False
+                i += 1
+            # Error Checking
+            elif brackLevel < 0:
+                raise Exception("Something went wrong in "
+                                "finding the end of an infobox")
+
+f.close()
+
+
+
+
+
+
+
 #name_from_line_test()
 # decimal_degrees_from_dms_test()
 
@@ -623,4 +702,4 @@ def test_coord_dict():
 #test_coord_dict()
 #test_latlon_for_key()
 #test_is_valid_coord()
-test_add_loc()
+#test_add_loc()

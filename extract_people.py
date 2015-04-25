@@ -180,12 +180,12 @@ class person_info_box:
     '''
     Defines a person info box container.
     '''
-    re_birth_date = re.compile("\|*.birth_date.*=")
-    re_birth_place = re.compile("\|*.birth_place.*=")
-    re_death_date = re.compile("\|*.death_date.*=")
-    re_death_place = re.compile("\|*.death_place.*=")
-    re_religion = re.compile("\|*.religion.*=")
-    re_party = re.compile("\|*.party.*=")
+    re_birth_date = re.compile("\| *birth_date *=")
+    re_birth_place = re.compile("\| *birth_place *=")
+    re_death_date = re.compile("\| *death_date *=")
+    re_death_place = re.compile("\| *death_place *=")
+    re_religion = re.compile("\| *religion *=")
+    re_party = re.compile("\| *party *=")
 
     def __init__(self):
         self.boxText = ""
