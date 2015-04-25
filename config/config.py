@@ -23,6 +23,7 @@ DATABASES = {
 
 SECRET_KEY = 'bnkanlxl&j31%zge2=q-pu1(!q0rl)4_--acl=di)2%-9)j_2_'
 
+DATA_PATH = '/Users/jasonkrone/Developer/text_mining/'
 
 # DATABASES = {
 #     'default': {

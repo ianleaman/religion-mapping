@@ -4,7 +4,6 @@ import bz2
 
 from schema.models import Loc_Name, Location
 
-
 NAME_KEYS = {"en_name": re.compile("\| *en_name *="),
              "conventional_long_name": re.compile("\| *conventional_long_name *="),
              "official_name": re.compile("\| *official_name *="),
@@ -104,23 +103,28 @@ def has_name(loc_dict):
     return has_name
 
 def dd_coords(loc_dict):
-    latd = loc_dict["latd"]
+    latd = loc_dict.get("latd")
     latm = zero_if_none(loc_dict.get("latm"))
     lats = zero_if_none(loc_dict.get("lats"))
+    latns = loc_dict.get("latns")
 
-    longd = loc_dict["longd"]
+    longd = loc_dict.get("longd")
     longm = zero_if_none(loc_dict.get("longm"))
     longs = zero_if_none(loc_dict.get("longs"))
+    longew = loc_dict.get("longew")
 
-    if latd is not None and longd is not None:
-        latdd = decimal_degrees(latd, latm, lats)
-        longdd = decimal_degrees(longd, longm, longs)
+    if latd and longd and latns and longew:
+        latdd = decimal_degrees(latd, latm, lats, latns)
+        longdd = decimal_degrees(longd, longm, longs, longew)
         return latdd, longdd
     else:
         return None, None
 
-def decimal_degrees(d, m, s):
-    return d + m/60.0 + s/3600.0
+def decimal_degrees(d, m, s, direction):
+    dec_degrees = d + m/60.0 + s/3600.0
+    if direction in ["s", "w"]:
+        dec_degrees = dec_degrees * -1
+    return dec_degrees
 
 def zero_if_none(val):
     if val is None:
@@ -636,14 +640,7 @@ def test_coord_dict():
         print("Test2 Failed, dict2:", dict2, "not", dict2_correct)
 
 
-
-
-
-
-
-
-
-f = bz2.open("/Users/jasonkrone/Developer/text_mining/enwiki-20150304-pages-articles-multistream.xml.bz2")
+f = bz2.open(DATA_PATH + "enwiki-20150304-pages-articles-multistream.xml.bz2")
 
 NON_LOC_UNUSABLE = 0
 onDoc = 0
@@ -693,10 +690,9 @@ f.close()
 
 
 
-
 #name_from_line_test()
 # decimal_degrees_from_dms_test()
-
+test_decimal_degrees()
 #test_coord_vals()
 
 #test_coord_dict()
