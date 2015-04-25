@@ -3,7 +3,7 @@ import sys
 import bz2
 
 from schema.models import Loc_Name, Location
-
+from config import config
 
 NAME_KEYS = {"en_name": re.compile("\| *en_name *="),
              "conventional_long_name": re.compile("\| *conventional_long_name *="),
@@ -643,7 +643,7 @@ def test_coord_dict():
 
 
 
-f = bz2.open("/Users/jasonkrone/Developer/text_mining/enwiki-20150304-pages-articles-multistream.xml.bz2")
+f = bz2.open(config.DATA_PATH)
 
 NON_LOC_UNUSABLE = 0
 onDoc = 0

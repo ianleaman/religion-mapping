@@ -24,6 +24,8 @@ DATABASES = {
 SECRET_KEY = 'bnkanlxl&j31%zge2=q-pu1(!q0rl)4_--acl=di)2%-9)j_2_'
 
 
+DATA_PATH = "C:/Users/ian/Desktop/Text Mining/Wikipedia/data/enwiki-20150304-pages-articles-multistream.xml.bz2"
+
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.postgresql_psycopg2',
