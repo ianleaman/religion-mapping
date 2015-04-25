@@ -104,23 +104,28 @@ def has_name(loc_dict):
     return has_name
 
 def dd_coords(loc_dict):
-    latd = loc_dict["latd"]
+    latd = loc_dict.get("latd")
     latm = zero_if_none(loc_dict.get("latm"))
     lats = zero_if_none(loc_dict.get("lats"))
+    latns = loc_dict.get("latns")
 
-    longd = loc_dict["longd"]
+    longd = loc_dict.get("longd")
     longm = zero_if_none(loc_dict.get("longm"))
     longs = zero_if_none(loc_dict.get("longs"))
+    longew = loc_dict.get("longew")
 
-    if latd is not None and longd is not None:
-        latdd = decimal_degrees(latd, latm, lats)
-        longdd = decimal_degrees(longd, longm, longs)
+    if latd and longd and latns and longew:
+        latdd = decimal_degrees(latd, latm, lats, latns)
+        longdd = decimal_degrees(longd, longm, longs, longew)
         return latdd, longdd
     else:
         return None, None
 
-def decimal_degrees(d, m, s):
-    return d + m/60.0 + s/3600.0
+def decimal_degrees(d, m, s, direction):
+    dec_degrees = d + m/60.0 + s/3600.0
+    if direction in ["s", "w"]:
+        dec_degrees = dec_degrees * -1
+    return dec_degrees
 
 def zero_if_none(val):
     if val is None:
@@ -630,7 +635,6 @@ def test_coord_dict():
     else:
         print("Test2 Failed, dict2:", dict2, "not", dict2_correct)
 
-
 pre_list = [
     (re.compile(r"(long|longitude|lons1)="), "lon="),
     (re.compile(r"(latitude|lats1)="), "lat="),
@@ -693,9 +697,10 @@ for line in f:
             # Exit the infobox
             if bracketSum == 0:
                 num_boxes_processed += 1
-                if num_boxes_processed % 100000 == 0:
+                if num_boxes_processed % 10000 == 0:
                     print("processed 100,000")
-                # box = latlon_format_fix(box)
+                box = box.lower()
+                box = latlon_format_fix(box)
                 if is_location(box):
                     try:
                         add_loc(box)
@@ -715,10 +720,8 @@ f.close()
 
 
 
-
 #name_from_line_test()
 # decimal_degrees_from_dms_test()
-
 #test_coord_vals()
 
 #test_coord_dict()
