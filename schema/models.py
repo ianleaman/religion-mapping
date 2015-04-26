@@ -30,11 +30,11 @@ class Location(models.Model):
 
 class Person(models.Model):
     """docstring for ClassName"""
-    subject = models.TextField()
-    birth_year = models.IntegerField()
+    subject = models.TextField(null=True, blank=True)
+    birth_year = models.IntegerField(null=True, blank=True)
     places = models.ManyToManyField('Location')
-    death_year = models.IntegerField()
+    death_year = models.IntegerField(null=True, blank=True)
     # Change these two to pickle fields?
     religion = models.TextField()
-    party = models.TextField()
+    party = models.TextField(null=True, blank=True)
     # location = models.ForeignKey('Location')

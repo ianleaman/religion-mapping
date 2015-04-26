@@ -19,17 +19,22 @@ Notes:
       can have multiple
 
 '''
-
 import bz2
 import re
 import sys
 import re
 import json
+from time import sleep
+from django.db import IntegrityError
 from geopy.geocoders import Nominatim
+
+import traceback
+
 
 from schema.models import *
 
 sys.path.append('..')
+
 
 f = bz2.open("data\enwiki-20150304-pages-articles-multistream.xml.bz2")
 
@@ -44,18 +49,28 @@ geo_dict = {}
 #                   Helper Functions
 #
 # #######################################################
+from geopy.exc import GeocoderTimedOut, GeocoderServiceError
+
+
 def get_geocoords(place_list):
     coords = None
     # print(place_list)
-    for place in place_list:
-        if place in geo_dict:
-            coords = geo_dict[place]
-        else:
-            coords = geolocator.geocode(place)
-            # coords = 10
-            if coords:
-                geo_dict[place] = coords
-                break
+    try:
+        for place in place_list:
+            if place in geo_dict:
+                coords = geo_dict[place]
+            else:
+                coords = geolocator.geocode(place, timeout=30)
+                sleep(.1)
+                # coords = 10
+                if coords:
+                    geo_dict[place] = coords
+                    break
+    except GeocoderTimedOut:
+        sleep(5)
+        raise person_info_box.InvalidGeoTag
+    except GeocoderServiceError:
+        raise person_info_box.InvalidGeoTag
 
     # print(coords, coords.latitude, coords.longitude)
     # print("===")
@@ -282,7 +297,7 @@ class person_info_box:
 
             lat, lon = get_geocoords(places)
             loc = None
-            print(lat, lon)
+            # print(lat, lon)
             if lat and lon:
                 loc = Location(lat=lat, lon=lon)
             else:
@@ -321,16 +336,18 @@ box = None
 # Box Counter
 i = 0
 # Keep track of last Boxes
-lastBox = 0
+lastBox = 348337
 
-numValid = 0
-numInValid = 0
-numGeoInvalid = 0
+# numValid = 0
+# numInValid = 0
+# numGeoInvalid = 0
+# Input previous stats
+numValid = 8580
+numInValid = 339615
+numGeoInvalid = 142
 try:
     for line in f:
         # A way to resume from abrupt stops
-        if i < lastBox:
-            continue
         line = line.decode("utf-8")
         if '<page>' in line:
             onPage = True
@@ -345,36 +362,60 @@ try:
 
             if onInfoBox:
                 bracketSum += line.count("{{") - line.count("}}")
-                box.addLine(line)
+                try:
+                    box.addLine(line)
+                except TypeError:
+                    continue
                 # Exit the infobox
                 if bracketSum == 0:
-                    try:
-                        box.close()
-                        numValid += 1
-                    except UnicodeDecodeError:
-                        print("error decode")
-                    except UnicodeEncodeError:
-                        print("error encode")
-                    except person_info_box.InvalidBox:
-                        numInValid += 1
-                    except person_info_box.InvalidGeoTag:
-                        numGeoInvalid += 1
+                    if i < lastBox:
+                        pass
+                    else:
+                        try:
+                            box.close()
+                            numValid += 1
+                        except UnicodeDecodeError:
+                            print("error decode")
+                        except UnicodeEncodeError:
+                            print("error encode")
+                        except person_info_box.InvalidBox:
+                            numInValid += 1
+                        except person_info_box.InvalidGeoTag:
+                            numGeoInvalid += 1
+                        except IntegrityError:
+                            numInValid += 1
 
                     onInfoBox = False
                     i += 1
 
                     # Progress Report
-                    if i % 100 == 0:
+                    if i % 1000 == 0:
+                        if i < lastBox:
+                            print("Skipped: ", end="")
                         print("Boxes Scanned: [", i, "] [", numValid, "/",
                               numInValid, "/", numGeoInvalid, "]")
-                    if i >= 101:
-                        break
+                        sleep(2)
+
+                    # if i >= 101:
+                    #     break
                 # Error Checking
                 elif brackLevel < 0:
                     raise Exception("Something went wrong in "
                                     "finding the end of an infobox")
 except Exception as e:
     print(e)
-    print("Last Box:\n\n", i, "\n\n")
+    traceback.print_exc()
+    print("\n\nLast Box:", i, "\n\n")
+
+print("Total Boxes Scanned: [", i, "] Valid: [", numValid, "/ Invalid:",
+      numInValid, "/ Invalid Geo:", numGeoInvalid, "]")
 
 f.close()
+
+'''
+Stats:
+    Total Boxes Scanned: 2628531
+    Valid Person Boxes: 28700
+    Invalid boxes: 2599132
+    Person Boxes with invalid Geo: 699
+'''
