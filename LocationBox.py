@@ -31,6 +31,8 @@ COORD_KEYS = {"coor": re.compile("\| *coor *="),
               }
 
 
+class InvalidBox(Exception):
+    pass
 
 
 def is_location(box):
@@ -61,9 +63,9 @@ def add_loc(info_box):
         # extract coordinate block
         for coord_key, regex in COORD_KEYS.items():
             if regex.search(line):
-                coord_dict = coord_dict(line)
+                cd = coord_dict(line)
                 #  add items in coord dictionary to loc_dict
-                loc_dict = merge_dicts(loc_dict, coord_dict)
+                loc_dict = merge_dicts(loc_dict, cd)
 
     latdd, londd = dd_coords(loc_dict)
     if latdd and londd and has_name(loc_dict):
@@ -71,18 +73,22 @@ def add_loc(info_box):
         loc_dict["londd"] = londd
         create_loc_obj(loc_dict)
     else:
-        raise Exception('Bad_Loc_Box')
+        raise InvalidBox()
 
 def test_add_loc():
     f = open('/Users/jasonkrone/Developer/text_mining/data/peru.txt', 'r')
     loc_box = ''
     for line in f:
         loc_box += line
+    print("loc_box b4", loc_box)
+    loc_box = latlon_format_fix(loc_box.lower())
+    print("loc_box after", loc_box)
     add_loc(loc_box)
 
 def merge_dicts(dict_a, dict_b):
-    for key, val in dict_b.items():
-        dict_a[key] = val
+    if dict_b is not None:
+        for key, val in dict_b.items():
+            dict_a[key] = val
     return dict_a
 
 def create_loc_obj(loc):
@@ -146,8 +152,6 @@ def name_from_line(line):
         dirty_name = key_value[1]
         name = re.split("&|\||{|{{", dirty_name, 1)[0]  # exclude nonsense
         name = name.strip()
-    else:
-        print("ERRROR_bad_name_line")  # TODO COUNT BAD
     if name == "":
         name = None
     return name
@@ -172,7 +176,11 @@ def latlon_for_key(latlon_key, line):
             key = pair[0].strip()
             value = pair[1].strip()
             if key == latlon_key and is_coord_str(value):
-                latlon_for_key = float(value)
+                if key == "latns" or key == "longew":
+                    latlon_for_key = value
+                else:
+                    latlon_for_key = float(value)
+                break
     return latlon_for_key
 
 def is_coord_str(coord):
@@ -225,7 +233,6 @@ def coord_dict(line):
         coord_dict = insert_vals_at_keys(coord_dict, LAT_KEYS, lats, is_float, "latns")
         coord_dict = insert_vals_at_keys(coord_dict, LON_KEYS, lons, is_float, "longew")
     else:
-        print("Issue in coord_dict()")
         coord_dict = None
     return coord_dict
 
@@ -241,7 +248,7 @@ def insert_vals_at_keys(a_dict, keys, vals, is_valid, invalid_key):
 
     for val in vals:
         if is_valid(val):
-            key = key_iter.next()
+            key = key_iter.__next__()
             a_dict[key] = val
         else:
             a_dict[invalid_key] = val
@@ -265,14 +272,15 @@ def extract_lats_lons(line):
     coords = coord_vals_from_text(line)
     if coords is not None:
         length = len(coords)
-        first_half = [floatify(coord) for coord in coords[0:length/2]]
-        second_half = [floatify(coord) for coord in coords[length/2:]]
-        if "n" in first_half or "s" in first_half:
-            lats = first_half
-            lons = second_half
-        elif "e" in first_half or "w" in first_half:
-            lats = second_half
-            lons = first_half
+        if length > 0 and length % 2 == 0:
+            first_half = [floatify(coord) for coord in coords[0:int(length/2)]]
+            second_half = [floatify(coord) for coord in coords[int(length/2):]]
+            if "n" in first_half or "s" in first_half:
+                lats = first_half
+                lons = second_half
+            elif "e" in first_half or "w" in first_half:
+                lats = second_half
+                lons = first_half
     return lats, lons
 
 def coord_vals_from_text(line):
@@ -284,9 +292,7 @@ def coord_vals_from_text(line):
     coord_vals = None
     try:
         coord_text = re.search("{ *{ *coord(.*)\|", line).group(1)
-        print(coord_text)
     except AttributeError:
-        print("Error parsing coord text")
         return None
     # values are separated by |
     coords_dirty = coord_text.split("|")
@@ -359,73 +365,6 @@ def test_coord_vals():
         print("Test coordv3 Passed")
     else:
         print("Test coordv3 Failed coordv3:", coordv3, "not", None)
-
-
-
-
-
-
-
-
-
-
-
-
-
-"""
-def decimal_degrees_from_dms(dms_string):
-    dms_array = dms_string.split("|")
-    decimal_degrees = None
-    degrees = None
-    minutes = None
-    seconds = None
-    is_north = 3  # arbitrary val not TRUE OR FALSE TODO: THIS DOES NOT WORK
-    if len(dms_array) == 5:
-        degree_key_val = dms_array[1].split("=")
-        print("degree_kv", degree_key_val)
-        minute_key_val = dms_array[2].split("=")
-        second_key_val = dms_array[3].split("=")
-        north_south_key_val = dms_array[4].split("=")
-        if len(degree_key_val) == 2:
-            degrees = int(degree_key_val[1].strip())
-            print("degrees", degrees)
-        if len(minute_key_val) == 2:
-            minutes = int(minute_key_val[1].strip())
-        if len(second_key_val) == 2:
-            seconds = int(second_key_val[1].strip())
-        if len(north_south_key_val) == 2:
-            is_north = north_south_key_val[1].strip() == "N"
-
-    if degrees is not None and minutes is not None and seconds is not None:
-        decimal_degrees = degrees + minutes/60.0 + seconds/3600.0
-        print(is_north)
-    return decimal_degrees
-
-
-
-
-
-Maxim Func:
-
-we need to do this pre preocessing 
-
-
-def latlon_format_fix(page):
-    page = re.sub(r"\b(long|longitude|lons1)=", "lon=", page)
-    page = re.sub(r"\b(latitude|lats1)=", "lat=", page)
-
-    page = re.sub(r"\b(latitudedegrees|lat_deg|lat_d)=", "latd=", page)
-    page = re.sub(r"\b(latitudeminutes|lat_min|lat_m)=", "latm=", page)
-    page = re.sub(r"\b(latitudeseconds|lat_sec)=", "lats=", page)
-    page = re.sub(r"\b(lat_ns)=", "latns=", page)
-
-    page = re.sub(r"\b(longtitudedegrees|longitudedegrees|lon_deg|long_d)=", "longd=", page)
-    page = re.sub(r"\b(longtitudeminutes|longitudeminutes|lon_min|long_m)=", "longm=", page)
-    page = re.sub(r"\b(longtitudeseconds|longitudeseconds|lon_sec)=", "long=", page)
-    page = re.sub(r"\b(long_ew)=", "longew=", page)
-
-    return page
-"""
 
 
 def decimal_degrees_from_dms_test():
@@ -561,17 +500,39 @@ def test_latlon_for_key():
     lats = "| latd = 51 | latm = 30 | lats = 26  | latNS = N".lower()
     lons = "| longd = 0 | longm = 7 | longs = 39 | longEW = W".lower()
     bad_line = "| latd =  | latm =      30 | lats = 26  | latNS = N".lower()
+    peru = "|latd=12 |latm=2.6 |latNS=S |longd=77 |longm=1.7 |longEW=W"
+
+
+    peru_latns = latlon_for_key("latns", peru)
+    peru_lonew = latlon_for_key("longew", peru)
+
+
 
     latd1 = latlon_for_key("latd", lats)
     latm1 = latlon_for_key("latm", lats)
     lats1 = latlon_for_key("lats", lats)
+    latns1 = latlon_for_key("latns", lats)
 
     lond1 = latlon_for_key("longd", lons)
     lonm1 = latlon_for_key("longm", lons)
     lons1 = latlon_for_key("longs", lons)
+    lonew = latlon_for_key("longew", lons)
 
     latd2 = latlon_for_key("latd", bad_line)
     latm2 = latlon_for_key("latm", bad_line)
+
+
+
+
+    if latns1 == "n":
+        print("Test latns1 Passed")
+    else:
+        print("Test latns1 Failed: latns:", latns1, "not n")
+
+    if lonew == "w":
+        print("Test lonew Passed")
+    else:
+        print("Test lonew Failed")
 
     if (latd1 == 51):
         print("Test latd1 Passed")
@@ -650,26 +611,32 @@ pre_list = [
 
 
 def latlon_format_fix(page):
-    for process, subst in pre_list:
-        page = process.sub(subst, page)
-    # page = re.sub(r"\b(long|longitude|lons1)=", "lon=", page)
-    # page = re.sub(r"\b(latitude|lats1)=", "lat=", page)
+    #for process, subst in pre_list:
+    #    page = process.sub(subst, page)
+    page = re.sub(r"(long|longitude|lons1) *=", "lon=", page)
+    page = re.sub(r"(latitude|lats1) *=", "lat=", page)
 
-    # page = re.sub(r"\b(latitudedegrees|lat_deg|lat_d)=", "latd=", page)
-    # page = re.sub(r"\b(latitudeminutes|lat_min|lat_m)=", "latm=", page)
-    # page = re.sub(r"\b(latitudeseconds|lat_sec)=", "lats=", page)
-    # page = re.sub(r"\b(lat_ns)=", "latns=", page)
+    page = re.sub(r'(latitudedegrees|lat_deg|lat_d) *=', "latd=", page)
+    page = re.sub(r"(latitudeminutes|lat_min|lat_m) *=", "latm=", page)
+    page = re.sub(r"(latitudeseconds|lat_sec) *=", "lats=", page)
+    page = re.sub(r"(lat_ns) *=", "latns=", page)
 
-    # page = re.sub(r"\b(longtitudedegrees|longitudedegrees|lon_deg|long_d)=", "longd=", page)
-    # page = re.sub(r"\b(longtitudeminutes|longitudeminutes|lon_min|long_m)=", "longm=", page)
-    # page = re.sub(r"\b(longtitudeseconds|longitudeseconds|lon_sec)=", "long=", page)
-    # page = re.sub(r"\b(long_ew)=", "longew=", page)
+    page = re.sub(r"(longtitudedegrees|longitudedegrees|lon_deg|long_d) *=", "longd=", page)
+    page = re.sub(r"(longtitudeminutes|longitudeminutes|lon_min|long_m) *=", "longm=", page)
+    page = re.sub(r"(longtitudeseconds|longitudeseconds|lon_sec) *=", "long=", page)
+    page = re.sub(r"(long_ew) *=", "longew=", page)
 
     return page
 
 
-f = bz2.open(config.DATA_PATH)
 
+# Import django transaction lib to turn off autocommit
+# from django.db import transaction
+# transaction.set_autocommit(False)
+
+f = bz2.open(config.DATA_PATH)
+error_boxes = None
+num_error_boxes = 0
 NON_LOC_UNUSABLE = 0
 onDoc = 0
 brackLevel = 0
@@ -679,6 +646,8 @@ box = ""
 num_boxes_processed = 0
 bracketSum = 0
 i = 0
+num_locs = 0
+
 for line in f:
     line = line.decode("utf-8")
     if '<page>' in line:
@@ -696,35 +665,56 @@ for line in f:
             box += line
             # Exit the infobox
             if bracketSum == 0:
+                # print(box, "\n\n\n\n\n")
                 num_boxes_processed += 1
                 if num_boxes_processed % 10000 == 0:
-                    print("processed 100,000")
-                box = box.lower()
-                box = latlon_format_fix(box)
+                    print("processed: ", num_boxes_processed)
+                box = latlon_format_fix(box.lower())
                 if is_location(box):
+                    num_locs += 1
                     try:
                         add_loc(box)
-                    except:
+                    except InvalidBox:
                         NON_LOC_UNUSABLE += 1
+                    except:
+                        if num_error_boxes % 10000 == 0:
+                            if error_boxes is not None:
+                                error_boxes.close()
+                            error_boxes = open('error_boxes.txt', 'w')
+                            print('opened error boxes')
+                        error_boxes.write(box)
+                        num_error_boxes += 1
+
+                    if num_locs % 10000 == 0:
+                        print(num_locs)
+                        print("Scanned:", num_locs, " -- Total Errors:", NON_LOC_UNUSABLE)
+
                 onInfoBox = False
+                box = ''
                 i += 1
             # Error Checking
             elif brackLevel < 0:
                 raise Exception("Something went wrong in "
                                 "finding the end of an infobox")
 
+
+# close error
+error_boxes.close()
+
+
+
+# Clean Up Final Batch
+# transaction.commit()
+# Return to defualt autocommit state
+# transaction.set_autocommit(True)
+
 f.close()
-
-
-
-
-
-
+"""
 #name_from_line_test()
 # decimal_degrees_from_dms_test()
 #test_coord_vals()
-
 #test_coord_dict()
 #test_latlon_for_key()
 #test_is_valid_coord()
-#test_add_loc()
+test_add_loc()
+"""
