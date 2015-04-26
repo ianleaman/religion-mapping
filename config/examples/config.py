@@ -22,6 +22,8 @@ SECRET_KEY = 'this_is_secret!'
 
 DATA_PATH = "path_to_wiki_data"
 
+RELIGION_PATH = "path_to_religion_file"
+
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.postgresql_psycopg2',

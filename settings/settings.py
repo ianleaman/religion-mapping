@@ -1,6 +1,6 @@
 import os
 import sys
-
+sys.path.append('..')
 # Requires at least debug, and secret key from django_settings
 # from config import django_settings
 from config import config
