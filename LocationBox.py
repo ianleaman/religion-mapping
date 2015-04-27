@@ -596,23 +596,8 @@ def test_coord_dict():
     else:
         print("Test2 Failed, dict2:", dict2, "not", dict2_correct)
 
-pre_list = [
-    (re.compile(r"(long|longitude|lons1)="), "lon="),
-    (re.compile(r"(latitude|lats1)="), "lat="),
-    (re.compile(r"(latitudedegrees|lat_deg|lat_d)="), "latd="),
-    (re.compile(r"(latitudeminutes|lat_min|lat_m)="), "latm="),
-    (re.compile(r"(latitudeseconds|lat_sec)="), "lats="),
-    (re.compile(r"(lat_ns)="), "latns="),
-    (re.compile(r"(longtitudedegrees|longitudedegrees|lon_deg|long_d)="), "longd="),
-    (re.compile(r"(longtitudeminutes|longitudeminutes|lon_min|long_m)="), "longm="),
-    (re.compile(r"(longtitudeseconds|longitudeseconds|lon_sec)="), "long="),
-    (re.compile(r"(long_ew)="), "longew="),
-]
-
 
 def latlon_format_fix(page):
-    #for process, subst in pre_list:
-    #    page = process.sub(subst, page)
     page = re.sub(r"(long|longitude|lons1) *=", "lon=", page)
     page = re.sub(r"(latitude|lats1) *=", "lat=", page)
 
@@ -701,20 +686,4 @@ for line in f:
 # close error
 error_boxes.close()
 
-
-
-# Clean Up Final Batch
-# transaction.commit()
-# Return to defualt autocommit state
-# transaction.set_autocommit(True)
-
 f.close()
-"""
-#name_from_line_test()
-# decimal_degrees_from_dms_test()
-#test_coord_vals()
-#test_coord_dict()
-#test_latlon_for_key()
-#test_is_valid_coord()
-test_add_loc()
-"""
