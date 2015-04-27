@@ -24,6 +24,8 @@ DATA_PATH = "path_to_wiki_data"
 
 RELIGION_PATH = "path_to_religion_file"
 
+PEOPLE_PATH = "path_to_people"
+
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.postgresql_psycopg2',
